@@ -1214,6 +1214,7 @@ function showToast(msg) {
 seedData();
 updateOnlineStatus();
 document.getElementById('version-tag').textContent = APP_VERSION;
+document.getElementById('role-version-tag').textContent = APP_VERSION + ' · ' + APP_DATE;
 // Show API key setup on first launch if no key stored
 if (!getApiKey()) {
   document.getElementById('apikey-screen').style.display = 'flex';
