@@ -613,18 +613,29 @@ Extract all purchased line items and return ONLY a JSON object, no markdown, no 
 }
 Rules: quantity×unit_cost should equal line total. Use actual unit price, not line total. If item shows "2@10.78" that means qty=2, unit_cost=10.78. Use 0 for missing numbers.`;
     } else {
-      prompt = `Extract all data from this Caltrans Daily Force Account Work Tentative Agreement form.
-Return ONLY a JSON object, no markdown, no explanation:
+      prompt = `You are reading a Caltrans force account / extra work agreement form. There are two common versions:
+- FA-0007 "Daily Force Account Work Tentative Agreement" — has Equipment No., Name/Hours columns
+- CEM-4907 "Tentative Daily Extra Work Agreement" — has Change Order No., Work Location, equipment with license plate IDs, materials with vendor/invoice columns
+
+Extract all data regardless of form version and return ONLY a JSON object, no markdown, no explanation:
 {
   "doc_type": "ta",
-  "date": "string",
-  "description": "string",
-  "ct_rep": "string",
+  "date": "string (MM/DD/YY)",
+  "contract_no": "string",
+  "cco_no": "string (Change Order No. if present, else empty)",
+  "description": "string (Work Description field)",
+  "work_location": "string (Work Location field if present, else empty)",
+  "ct_rep": "string (Caltrans Representative name)",
+  "contractor_rep": "string (Contractor Representative name if present)",
   "labor": [{ "name": "string", "classification": "string", "st": number, "ot": number }],
-  "equipment": [{ "equip_no": "string", "description": "string", "hours": number }],
-  "materials": [{ "description": "string", "quantity": number, "unit": "string", "unit_cost": number }]
+  "equipment": [{ "equip_no": "string (ID/plate/number or empty)", "description": "string", "hours": number, "ot_hours": number }],
+  "materials": [{ "description": "string", "vendor": "string", "invoice_no": "string", "quantity": number, "unit": "string", "unit_cost": number }]
 }
-Use 0 for blank numbers. Empty array [] if no items. Write "illegible" for unreadable fields.`;
+Rules:
+- Use 0 for blank numbers. Empty string "" for blank text fields. Empty array [] if no items.
+- For materials with only a description and no cost (e.g. listed by qty in description), set unit_cost to 0.
+- Write "illegible" only if truly unreadable.
+- For equipment hours, use the Regular hours column for "st" and Overtime column for "ot_hours".`;
     }
 
     const apiKey = getApiKey();
@@ -710,12 +721,13 @@ function showPreview(parsed) {
       </div>`;
   } else {
     const totalLaborHrs = parsed.labor.reduce((s, l) => s + (l.st||0) + (l.ot||0), 0);
-    const totalEquipHrs = parsed.equipment.reduce((s, e) => s + (e.hours||0), 0);
+    const totalEquipHrs = parsed.equipment.reduce((s, e) => s + (e.hours||0) + (e.ot_hours||0), 0);
     card.innerHTML = `
       <div class="card-header" style="border-left: 3px solid var(--accent);">
         <div>
-          <div class="card-title">${parsed.date || 'Unknown Date'}</div>
+          <div class="card-title">${parsed.date || 'Unknown Date'}${parsed.cco_no ? ' · CCO #'+parsed.cco_no : ''}</div>
           <div class="card-meta">${parsed.description || ''}</div>
+          ${parsed.work_location ? `<div style="font-size:10px;color:var(--text3);margin-top:2px;">📍 ${parsed.work_location}</div>` : ''}
         </div>
         <span class="badge badge-pending">TA FORM</span>
       </div>
@@ -730,18 +742,22 @@ function showPreview(parsed) {
         <div class="section-header">Equipment (${parsed.equipment.length} units · ${totalEquipHrs} hrs)</div>
         ${parsed.equipment.map(e => `
           <div class="parsed-row">
-            <span class="parsed-key">${e.equip_no} ${e.description}</span>
-            <span class="parsed-val">${e.hours}h</span>
+            <span class="parsed-key">${e.equip_no ? e.equip_no+' · ' : ''}${e.description}</span>
+            <span class="parsed-val">${e.hours}h${e.ot_hours>0?' / '+e.ot_hours+'OT':''}</span>
           </div>`).join('')}
         ${parsed.equipment.length === 0 ? '<div style="font-size:11px;color:var(--text3);">None</div>' : ''}
         ${parsed.materials.length > 0 ? `
         <div class="section-header">Materials (${parsed.materials.length} items)</div>
         ${parsed.materials.map(m => `
           <div class="parsed-row">
-            <span class="parsed-key">${m.description}</span>
-            <span class="parsed-val">${m.quantity} ${m.unit} @ $${m.unit_cost}</span>
+            <span class="parsed-key">${m.description}${m.vendor?' <span style="color:var(--text3);">('+m.vendor+')</span>':''}</span>
+            <span class="parsed-val">${m.quantity>0?m.quantity+' '+m.unit:''}${m.unit_cost>0?' @ $'+m.unit_cost:''}</span>
           </div>`).join('')}` : ''}
-        ${parsed.ct_rep ? `<div style="margin-top:12px;font-size:10px;color:var(--text3);">CT Rep: ${parsed.ct_rep}</div>` : ''}
+        <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border);">
+          ${parsed.ct_rep ? `<div style="font-size:10px;color:var(--text3);">CT Rep: ${parsed.ct_rep}</div>` : ''}
+          ${parsed.contractor_rep ? `<div style="font-size:10px;color:var(--text3);">Contractor Rep: ${parsed.contractor_rep}</div>` : ''}
+          ${parsed.contract_no ? `<div style="font-size:10px;color:var(--text3);">Contract: ${parsed.contract_no}</div>` : ''}
+        </div>
       </div>`;
   }
   showView('preview');
