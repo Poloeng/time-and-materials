@@ -216,7 +216,15 @@
         → API Keys → Create Key<br/>
         Starts with <span style="color:var(--accent);">sk-ant-api03-</span>
       </div>
-      <button class="btn btn-primary" onclick="saveApiKeyAndContinue()">Save &amp; Continue</button>
+      <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+        <div style="font-size:10px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">SharePoint Webhook URL <span style="color:var(--text3);font-size:9px;">(optional)</span></div>
+        <input id="webhook-input" type="url" placeholder="https://prod-xx.westus.logic.azure.com/..." autocomplete="off"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none;margin-bottom:6px;"/>
+        <div style="font-size:10px;color:var(--text3);line-height:1.6;">Paste your Power Automate HTTP trigger URL here to sync submissions to SharePoint.</div>
+      </div>
+      <div style="margin-top:16px;">
+        <button class="btn btn-primary" onclick="saveApiKeyAndContinue()">Save &amp; Continue</button>
+      </div>
     </div>
     <div style="text-align:center;margin-top:16px;font-size:10px;color:var(--text3);">
       Your key is stored in this browser only.<br/>It is never sent anywhere except Anthropic's API.
@@ -231,8 +239,8 @@
   </div>
   <div class="role-card" onclick="setRole('inspector')">
     <div class="role-card-icon">🦺</div>
-    <div class="role-card-title" style="color:var(--green);">Field Inspector</div>
-    <div class="role-card-desc">Scan & submit daily TA forms from the jobsite</div>
+    <div class="role-card-title" style="color:var(--green);">Foreman</div>
+    <div class="role-card-desc">Scan & submit daily TA forms and receipts</div>
   </div>
   <div class="role-card" onclick="setRole('pm')">
     <div class="role-card-icon">📋</div>
@@ -265,21 +273,20 @@
     <div class="screen active" id="screen-scan">
       <div id="scan-upload-view">
 
-        <!-- Doc type toggle -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
-          <div class="doctype-btn active" id="doctype-ta" onclick="setDocType('ta')">
-            <div style="font-size:20px;margin-bottom:4px;">📋</div>
-            <div class="doctype-label">TA Form</div>
-            <div class="doctype-sub">Daily Force Account</div>
+        <!-- Phase indicator -->
+        <div style="display:flex; align-items:center; gap:0; margin-bottom:14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+          <div id="phase-ta" style="flex:1; padding:10px; text-align:center; background:var(--accent); transition:background 0.2s;">
+            <div style="font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:1px; color:#000;">1 · TA FORM</div>
           </div>
-          <div class="doctype-btn" id="doctype-receipt" onclick="setDocType('receipt')">
-            <div style="font-size:20px;margin-bottom:4px;">🧾</div>
-            <div class="doctype-label">Receipt</div>
-            <div class="doctype-sub">Material / Supply</div>
+          <div id="phase-receipts" style="flex:1; padding:10px; text-align:center; transition:background 0.2s;">
+            <div style="font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:1px; color:var(--text3);">2 · RECEIPTS</div>
+          </div>
+          <div id="phase-submit" style="flex:1; padding:10px; text-align:center; transition:background 0.2s;">
+            <div style="font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:1px; color:var(--text3);">3 · SUBMIT</div>
           </div>
         </div>
 
-        <div class="section-header" id="scan-section-label">Upload TA Form</div>
+        <div class="section-header" id="scan-section-label">Step 1 — Scan TA Form</div>
 
         <!-- Hidden file inputs for each source -->
         <input type="file" id="file-camera"   accept="image/*" capture="environment" style="display:none" onchange="handleFileSelect(event)"/>
@@ -305,9 +312,23 @@
           </div>
         </div>
 
+        <!-- Receipt list (shown in phase 2) -->
+        <div id="receipts-list-section" style="display:none; margin-bottom:12px;">
+          <div style="font-size:10px; color:var(--text3); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">Scanned Receipts</div>
+          <div id="receipts-list"></div>
+        </div>
+
         <!-- Drag-and-drop zone (desktop / paste fallback) -->
         <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-library').click()">
           <div style="font-size:12px; color:var(--text3); letter-spacing:1px;">Or drag &amp; drop / paste a scan here</div>
+        </div>
+
+        <!-- Phase 2 actions -->
+        <div id="receipt-phase-actions" style="display:none; margin-top:12px;">
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-ghost" style="flex:1;" onclick="skipReceiptsAndSubmit()">No Receipts — Submit</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="doneAddingReceipts()">Done — Review &amp; Submit</button>
+          </div>
         </div>
         <div style="margin-top:12px;">
           <div class="card">
@@ -380,8 +401,8 @@
       <div class="export-opt" onclick="showApiKeyScreen()">
         <div class="export-icon">🔑</div>
         <div>
-          <div class="export-label">Update API Key</div>
-          <div class="export-sub">Change or re-enter your Anthropic API key</div>
+          <div class="export-label">Update API Key / Webhook</div>
+          <div class="export-sub">Anthropic API key &amp; SharePoint webhook URL</div>
         </div>
       </div>
     </div>
@@ -403,17 +424,25 @@
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v1.4';
+const APP_VERSION = 'v1.5';
 const APP_DATE    = '2026-05-27';
 let role = null;
 let isOnline = navigator.onLine;
 let pendingFile = null;
 let pendingParsed = null;
+let pendingReceipts = [];   // [{parsed, base64, mimeType, fileName}]
+let pendingTABase64 = null;
+let pendingTAMime   = null;
+let scanPhase = 'ta';       // 'ta' | 'receipts'
 
 // Storage keys
 const KEY_ENTRIES = 'tm_entries';
 const KEY_QUEUE   = 'tm_queue';
-const KEY_APIKEY  = 'tm_apikey';
+const KEY_APIKEY   = 'tm_apikey';
+const KEY_WEBHOOK  = 'tm_webhook';
+
+function getWebhook()    { return localStorage.getItem(KEY_WEBHOOK) || ''; }
+function saveWebhook(u)  { localStorage.setItem(KEY_WEBHOOK, u.trim()); }
 
 function getApiKey()       { return localStorage.getItem(KEY_APIKEY) || ''; }
 function saveApiKey(k)     { localStorage.setItem(KEY_APIKEY, k.trim()); }
@@ -464,7 +493,7 @@ function setRole(r) {
   document.getElementById('role-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   const badge = document.getElementById('role-badge');
-  badge.textContent = r === 'inspector' ? '🦺 Inspector' : '📋 PM';
+  badge.textContent = r === 'inspector' ? '🦺 Foreman' : '📋 PM';
   badge.className = 'role-badge ' + (r === 'inspector' ? 'role-inspector' : 'role-pm');
   buildNav();
   renderAll();
@@ -480,6 +509,8 @@ function showApiKeyScreen() {
   document.getElementById('app').style.display = 'none';
   const existing = getApiKey();
   if (existing) document.getElementById('apikey-input').value = existing;
+  const wh = document.getElementById('webhook-input');
+  if (wh) wh.value = getWebhook();
 }
 
 function saveApiKeyAndContinue() {
@@ -490,6 +521,8 @@ function saveApiKeyAndContinue() {
     return;
   }
   saveApiKey(val);
+  const wh = document.getElementById('webhook-input');
+  if (wh && wh.value.trim()) saveWebhook(wh.value.trim());
   document.getElementById('apikey-screen').style.display = 'none';
   document.getElementById('role-screen').style.display = 'flex';
 }
@@ -565,6 +598,8 @@ function handleFileSelect(e) {
   if (!file) return;
   pendingFile = file;
   extractFormData(file);
+  // reset input so same file can be re-selected
+  e.target.value = '';
 }
 
 const dropZone = document.getElementById('upload-zone');
@@ -576,8 +611,76 @@ dropZone.addEventListener('drop', e => {
   if (file) { pendingFile = file; extractFormData(file); }
 });
 
-// ─── DOC TYPE ─────────────────────────────────────────────────────────────────
-let currentDocType = 'ta'; // 'ta' or 'receipt'
+// ─── SCAN PHASE MANAGEMENT ───────────────────────────────────────────────────
+let currentDocType = 'ta'; // kept for receipt extraction path
+
+function setScanPhase(phase) {
+  scanPhase = phase;
+  const taEl      = document.getElementById('phase-ta');
+  const recEl     = document.getElementById('phase-receipts');
+  const subEl     = document.getElementById('phase-submit');
+  const label     = document.getElementById('scan-section-label');
+  const recList   = document.getElementById('receipts-list-section');
+  const recActs   = document.getElementById('receipt-phase-actions');
+
+  // Reset all
+  [taEl, recEl, subEl].forEach(el => {
+    el.style.background = 'transparent';
+    el.firstElementChild.style.color = 'var(--text3)';
+  });
+
+  if (phase === 'ta') {
+    taEl.style.background = 'var(--accent)';
+    taEl.firstElementChild.style.color = '#000';
+    label.textContent = 'Step 1 — Scan TA Form';
+    recList.style.display = 'none';
+    recActs.style.display = 'none';
+    currentDocType = 'ta';
+  } else if (phase === 'receipts') {
+    recEl.style.background = 'var(--accent)';
+    recEl.firstElementChild.style.color = '#000';
+    label.textContent = 'Step 2 — Scan Receipts (optional)';
+    recList.style.display = 'block';
+    recActs.style.display = 'block';
+    currentDocType = 'receipt';
+    renderReceiptsList();
+  }
+}
+
+function setDocType(type) {
+  currentDocType = type; // legacy support
+}
+
+function renderReceiptsList() {
+  const el = document.getElementById('receipts-list');
+  if (!el) return;
+  if (pendingReceipts.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:8px 0;">No receipts added yet.</div>';
+    return;
+  }
+  el.innerHTML = pendingReceipts.map((r, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface2);border-radius:6px;margin-bottom:6px;font-size:11px;">
+      <div>
+        <div style="color:#fff;font-weight:500;">${r.parsed.vendor || 'Receipt ' + (i+1)}</div>
+        <div style="color:var(--text3);margin-top:2px;">${r.parsed.date || ''} · ${r.parsed.materials.length} items · $${Number(r.parsed.total||0).toFixed(2)}</div>
+      </div>
+      <button onclick="removeReceipt(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px;">✕</button>
+    </div>`).join('');
+}
+
+function removeReceipt(i) {
+  pendingReceipts.splice(i, 1);
+  renderReceiptsList();
+}
+
+function skipReceiptsAndSubmit() {
+  pendingReceipts = [];
+  submitPackage();
+}
+
+function doneAddingReceipts() {
+  submitPackage();
+}
 
 function setDocType(type) {
   currentDocType = type;
@@ -590,6 +693,11 @@ async function extractFormData(file) {
   showView('processing');
   try {
     const base64 = await fileToBase64(file);
+    // Save base64 for later SharePoint upload
+    if (scanPhase === 'ta') {
+      pendingTABase64 = base64;
+      pendingTAMime   = file.type;
+    }
     const isImage = file.type.startsWith('image/');
     const contentBlock = isImage
       ? { type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } }
@@ -672,6 +780,10 @@ Rules:
     const text = data.content?.map(b => b.text || '').join('') || '';
     const clean = text.replace(/```json|```/g, '').trim();
     pendingParsed = JSON.parse(clean);
+    // Stash TA data so it survives into receipt phase
+    if (scanPhase === 'ta') {
+      localStorage.setItem('tm_pending_ta', JSON.stringify(pendingParsed));
+    }
     showPreview(pendingParsed);
   } catch (err) {
     showView('upload');
@@ -720,6 +832,10 @@ Fill in all fields from the form. Use empty arrays if section is blank.`;
     const text = data.content?.map(b => b.text || '').join('') || '';
     const clean = text.replace(/```json|```/g, '').trim();
     pendingParsed = JSON.parse(clean);
+    // Stash TA data so it survives into receipt phase
+    if (scanPhase === 'ta') {
+      localStorage.setItem('tm_pending_ta', JSON.stringify(pendingParsed));
+    }
     showPreview(pendingParsed);
   } catch (err) {
     showView('upload');
@@ -811,25 +927,74 @@ function showPreview(parsed) {
         </div>
       </div>`;
   }
+  // Update action buttons based on phase
+  const submitBtn = document.querySelector('#scan-preview-view .btn-primary');
+  const retakeBtn = document.querySelector('#scan-preview-view .btn-ghost');
+  if (submitBtn) {
+    if (scanPhase === 'ta') {
+      submitBtn.textContent = 'Next — Add Receipts →';
+      submitBtn.onclick = confirmTAAndNextPhase;
+    } else {
+      submitBtn.textContent = 'Add This Receipt';
+      submitBtn.onclick = addReceiptAndContinue;
+    }
+  }
   showView('preview');
 }
 
-function submitForm() {
+function confirmTAAndNextPhase() {
   if (!pendingParsed) return;
+  // Move to receipt scanning phase
+  pendingReceipts = [];
+  resetScanInputs();
+  showView('upload');
+  setScanPhase('receipts');
+}
+
+function addReceiptAndContinue() {
+  if (!pendingParsed) return;
+  // Store receipt with its base64
+  const receiptBase64 = pendingTABase64; // reuse last scanned b64 (receipt was last scanned)
+  pendingReceipts.push({
+    parsed: pendingParsed,
+    base64: receiptBase64,
+    mimeType: pendingFile ? pendingFile.type : 'image/jpeg'
+  });
+  pendingParsed = null;
+  resetScanInputs();
+  showView('upload');
+  setScanPhase('receipts');
+  showToast('✓ Receipt added — scan another or submit');
+}
+
+async function submitPackage() {
+  if (!pendingParsed && scanPhase !== 'receipts') return;
+
+  // Retrieve the stored TA parsed data
+  const taData = JSON.parse(localStorage.getItem('tm_pending_ta') || 'null');
+  const entryTA = taData || pendingParsed;
+  if (!entryTA) { showToast('No TA form found — please rescan'); return; }
+
   const entry = {
     id: 'entry_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-    ...pendingParsed,
+    ...entryTA,
+    receipts: pendingReceipts.map(r => r.parsed),
+    ta_image_b64: pendingTABase64,
+    ta_image_mime: pendingTAMime,
+    receipt_images: pendingReceipts.map(r => ({ b64: r.base64, mime: r.mimeType })),
     status: 'pending',
     submitted_at: new Date().toISOString(),
   };
 
+  // Save to local ledger
   if (isOnline) {
     const entries = getEntries();
-    // Replace if same date exists as pending
     const idx = entries.findIndex(e => e.date === entry.date && e.status === 'pending');
     if (idx >= 0) entries[idx] = entry; else entries.push(entry);
     saveEntries(entries);
     showToast('✓ Submitted for PM review');
+    // Send to SharePoint webhook if configured
+    sendToSharePoint(entry);
   } else {
     const q = getQueue();
     q.push(entry);
@@ -837,19 +1002,74 @@ function submitForm() {
     showToast('⚡ Queued — will sync when online');
   }
 
+  localStorage.removeItem('tm_pending_ta');
+  pendingReceipts = [];
+  pendingTABase64 = null;
+  pendingTAMime = null;
   resetScan();
   renderQueueList();
   updateReviewBadge();
 }
 
-function resetScan() {
-  pendingFile = null;
-  pendingParsed = null;
+// Legacy — kept so old buttons still work
+function submitForm() { submitPackage(); }
+
+async function sendToSharePoint(entry) {
+  const webhookUrl = getWebhook();
+  if (!webhookUrl) return;
+  try {
+    // Build a clean payload without huge base64 images in the main body
+    const payload = {
+      id: entry.id,
+      date: entry.date,
+      contract_no: entry.contract_no || '07-2XW04',
+      cco_no: entry.cco_no || '',
+      description: entry.description || '',
+      work_location: entry.work_location || '',
+      ct_rep: entry.ct_rep || '',
+      contractor_rep: entry.contractor_rep || '',
+      status: entry.status,
+      submitted_at: entry.submitted_at,
+      labor: entry.labor || [],
+      equipment: entry.equipment || [],
+      materials: entry.materials || [],
+      receipts: entry.receipts || [],
+      ta_image_b64: entry.ta_image_b64 || '',
+      ta_image_mime: entry.ta_image_mime || 'image/jpeg',
+      receipt_images: entry.receipt_images || [],
+      total_labor_st: (entry.labor||[]).reduce((s,l)=>s+(l.st||0),0),
+      total_labor_ot: (entry.labor||[]).reduce((s,l)=>s+(l.ot||0),0),
+      total_equip_hrs: (entry.equipment||[]).reduce((s,e)=>s+(e.hours||0),0),
+      total_material_cost: (entry.receipts||[]).reduce((s,r)=>s+(r.total||0),0),
+    };
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    showToast('✓ Synced to SharePoint');
+  } catch(e) {
+    console.error('SharePoint sync failed:', e);
+  }
+}
+
+function resetScanInputs() {
   ['file-camera','file-library','file-files'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+}
+
+function resetScan() {
+  pendingFile = null;
+  pendingParsed = null;
+  pendingReceipts = [];
+  pendingTABase64 = null;
+  pendingTAMime = null;
+  scanPhase = 'ta';
+  resetScanInputs();
   showView('upload');
+  setScanPhase('ta');
 }
 
 function syncQueue() {
@@ -1119,7 +1339,12 @@ function openDetailModal(id) {
     </table>`:''}
 
     ${entry.ct_rep?`<div style="font-size:10px;color:var(--text3);">CT Representative: ${entry.ct_rep}</div>`:''}
-    <div style="font-size:10px;color:var(--text3);margin-top:4px;">Status: <span class="badge badge-${entry.status}">${entry.status}</span></div>
+    ${entry.contractor_rep?`<div style="font-size:10px;color:var(--text3);">Contractor Rep: ${entry.contractor_rep}</div>`:''}
+    ${(entry.receipts&&entry.receipts.length>0)?`
+    <div style="font-size:10px;color:var(--orange);letter-spacing:1.5px;text-transform:uppercase;margin:12px 0 6px;font-weight:700;">Receipts (${entry.receipts.length})</div>
+    ${entry.receipts.map(r=>`<div style="font-size:11px;color:var(--text2);padding:6px 0;border-bottom:1px solid var(--border);">${r.vendor||'Receipt'} · ${r.date||''} · $${Number(r.total||0).toFixed(2)}</div>`).join('')}`:''}
+    ${entry.ta_image_b64?`<div style="margin-top:12px;"><div style="font-size:10px;color:var(--text3);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;">TA Form Image</div><img src="data:${entry.ta_image_mime||'image/jpeg'};base64,${entry.ta_image_b64}" style="width:100%;border-radius:6px;border:1px solid var(--border);"/></div>`:''}
+    <div style="font-size:10px;color:var(--text3);margin-top:8px;">Status: <span class="badge badge-${entry.status}">${entry.status}</span></div>
     ${role==='pm' && entry.status==='pending'?`
     <div style="margin-top:16px;display:flex;gap:8px;">
       <button class="btn btn-success" onclick="approveEntry('${entry.id}');closeModal()">✓ Approve</button>
