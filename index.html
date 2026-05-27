@@ -253,6 +253,7 @@
         <span class="sync-dot" id="sync-dot"></span>
         <span id="sync-status">Online</span>
         &nbsp;·&nbsp; Contract 07-2XW04
+        &nbsp;·&nbsp; <span id="version-tag" style="color:var(--text3);"></span>
       </div>
     </div>
     <button class="role-badge" id="role-badge" onclick="showRoleScreen()"></button>
@@ -402,6 +403,8 @@
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
+const APP_VERSION = 'v1.4';
+const APP_DATE    = '2026-05-27';
 let role = null;
 let isOnline = navigator.onLine;
 let pendingFile = null;
@@ -650,7 +653,7 @@ Rules:
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 2000,
         messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: prompt }] }]
       })
@@ -708,7 +711,7 @@ Fill in all fields from the form. Use empty arrays if section is blank.`;
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 2000,
         messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: prompt }] }]
       })
@@ -1210,6 +1213,7 @@ function showToast(msg) {
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 seedData();
 updateOnlineStatus();
+document.getElementById('version-tag').textContent = APP_VERSION;
 // Show API key setup on first launch if no key stored
 if (!getApiKey()) {
   document.getElementById('apikey-screen').style.display = 'flex';
