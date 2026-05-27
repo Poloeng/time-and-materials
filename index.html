@@ -651,7 +651,7 @@ Rules:
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 2000,
         messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: prompt }] }]
       })
     });
@@ -672,8 +672,56 @@ Rules:
     showPreview(pendingParsed);
   } catch (err) {
     showView('upload');
-    showToast('Could not read form — try a clearer scan');
-    console.error(err);
+    const msg = err.message || '';
+    if (msg.includes('JSON') || msg.includes('parse')) {
+      showToast('Parse error — retrying with simpler extraction...');
+      // Retry with a simpler prompt
+      retrySimpleExtract(pendingFile);
+    } else {
+      showToast('Error: ' + (msg.slice(0,60) || 'Could not read form'));
+    }
+    console.error('Extract error:', err);
+  }
+}
+
+async function retrySimpleExtract(file) {
+  if (!file) { showView('upload'); return; }
+  showView('processing');
+  try {
+    const base64 = await fileToBase64(file);
+    const isImage = file.type.startsWith('image/');
+    const contentBlock = isImage
+      ? { type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } }
+      : { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } };
+
+    const prompt = `Read this Caltrans work form. Return ONLY valid JSON, nothing else:
+{"doc_type":"ta","date":"","contract_no":"","cco_no":"","description":"","work_location":"","ct_rep":"","contractor_rep":"","labor":[{"name":"","classification":"","st":0,"ot":0}],"equipment":[{"equip_no":"","description":"","hours":0,"ot_hours":0}],"materials":[{"description":"","vendor":"","invoice_no":"","quantity":0,"unit":"EA","unit_cost":0}]}
+Fill in all fields from the form. Use empty arrays if section is blank.`;
+
+    const apiKey = getApiKey();
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: prompt }] }]
+      })
+    });
+    const data = await response.json();
+    const text = data.content?.map(b => b.text || '').join('') || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    pendingParsed = JSON.parse(clean);
+    showPreview(pendingParsed);
+  } catch (err) {
+    showView('upload');
+    showToast('Could not read form — please try again');
+    console.error('Retry failed:', err);
   }
 }
 
