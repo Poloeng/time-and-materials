@@ -424,8 +424,8 @@
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v1.5';
-const APP_DATE    = '2026-05-27';
+const APP_VERSION = 'v1.6';
+const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
 let pendingFile = null;
@@ -968,12 +968,14 @@ function addReceiptAndContinue() {
 }
 
 async function submitPackage() {
-  if (!pendingParsed && scanPhase !== 'receipts') return;
-
   // Retrieve the stored TA parsed data
   const taData = JSON.parse(localStorage.getItem('tm_pending_ta') || 'null');
   const entryTA = taData || pendingParsed;
-  if (!entryTA) { showToast('No TA form found — please rescan'); return; }
+  if (!entryTA) {
+    showToast('No TA form found — please scan Step 1 first');
+    resetScan();
+    return;
+  }
 
   const entry = {
     id: 'entry_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
@@ -1067,6 +1069,7 @@ function resetScan() {
   pendingTABase64 = null;
   pendingTAMime = null;
   scanPhase = 'ta';
+  localStorage.removeItem('tm_pending_ta');
   resetScanInputs();
   showView('upload');
   setScanPhase('ta');
@@ -1438,6 +1441,8 @@ function showToast(msg) {
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 seedData();
 updateOnlineStatus();
+// Clear any stale scan state so app always starts at Step 1
+localStorage.removeItem('tm_pending_ta');
 document.getElementById('version-tag').textContent = APP_VERSION;
 document.getElementById('role-version-tag').textContent = APP_VERSION + ' · ' + APP_DATE;
 // Show API key setup on first launch if no key stored
