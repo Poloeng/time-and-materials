@@ -232,11 +232,11 @@
   </div>
 </div>
 
-<div id="role-screen" style="display:none;">
+<div id="role-screen">
   <div style="text-align:center; margin-bottom:32px;">
     <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800; letter-spacing:3px; color:#fff;">POLO ENGINEERING</div>
     <div style="font-size:10px; color:var(--text3); letter-spacing:2px; margin-top:4px;">T&M FORCE ACCOUNT SYSTEM · CONTRACT 07-2XW04</div>
-    <div style="font-size:11px; color:var(--accent); letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag"></div>
+    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.1 · 2026-06-05</div>
   </div>
   <div class="role-card" onclick="setRole('inspector')">
     <div class="role-card-icon">🦺</div>
@@ -427,7 +427,7 @@
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v2.0';
+const APP_VERSION = 'v2.1';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
@@ -1479,14 +1479,19 @@ if (_rvt) _rvt.textContent = '— ' + APP_VERSION + ' · ' + APP_DATE + ' —';
 if (_lvt) _lvt.textContent = APP_VERSION + ' · ' + APP_DATE;
 
 // Show correct screen on launch
-if (!getApiKey()) {
-  document.getElementById('apikey-screen').style.display = 'flex';
-  document.getElementById('role-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'none';
-} else {
-  document.getElementById('apikey-screen').style.display = 'none';
+try {
+  if (!getApiKey()) {
+    document.getElementById('apikey-screen').style.display = 'flex';
+    document.getElementById('role-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'none';
+  } else {
+    document.getElementById('apikey-screen').style.display = 'none';
+    document.getElementById('role-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+} catch(e) {
+  console.error('Init error:', e);
   document.getElementById('role-screen').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
 }
 
 // Clipboard paste (desktop or iOS Share Sheet → Copy)
