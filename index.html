@@ -236,7 +236,7 @@
   <div style="text-align:center; margin-bottom:32px;">
     <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800; letter-spacing:3px; color:#fff;">POLO ENGINEERING</div>
     <div style="font-size:10px; color:var(--text3); letter-spacing:2px; margin-top:4px;">T&M FORCE ACCOUNT SYSTEM · CONTRACT 07-2XW04</div>
-    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.1 · 2026-06-05</div>
+    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.2 · 2026-06-05</div>
   </div>
   <div class="role-card" onclick="setRole('inspector')">
     <div class="role-card-icon">🦺</div>
@@ -426,8 +426,17 @@
 <div id="toast"></div>
 
 <script>
+// Global error handler - shows errors on screen
+window.onerror = function(msg, src, line, col, err) {
+  var div = document.createElement('div');
+  div.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#ff0000;color:#fff;padding:12px;font-size:11px;z-index:9999;font-family:monospace;';
+  div.textContent = 'JS ERROR line ' + line + ': ' + msg;
+  document.body.appendChild(div);
+  return false;
+};
+
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v2.1';
+const APP_VERSION = 'v2.2';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
