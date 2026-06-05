@@ -424,7 +424,7 @@
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v1.7';
+const APP_VERSION = 'v1.8';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
@@ -1467,7 +1467,7 @@ updateOnlineStatus();
 // Clear any stale scan state so app always starts at Step 1
 localStorage.removeItem('tm_pending_ta');
 document.getElementById('version-tag').textContent = APP_VERSION;
-document.getElementById('role-version-tag').textContent = APP_VERSION + ' · ' + APP_DATE;
+document.getElementById('role-version-tag').textContent = '— ' + APP_VERSION + ' · ' + APP_DATE + ' —';
 // Show API key setup on first launch if no key stored
 if (!getApiKey()) {
   document.getElementById('apikey-screen').style.display = 'flex';
