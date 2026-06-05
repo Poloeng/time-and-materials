@@ -236,7 +236,7 @@
   <div style="text-align:center; margin-bottom:32px;">
     <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800; letter-spacing:3px; color:#fff;">POLO ENGINEERING</div>
     <div style="font-size:10px; color:var(--text3); letter-spacing:2px; margin-top:4px;">T&M FORCE ACCOUNT SYSTEM · CONTRACT 07-2XW04</div>
-    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.3 · 2026-06-05</div>
+    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.4 · 2026-06-05</div>
   </div>
   <div class="role-card" onclick="setRole('inspector')">
     <div class="role-card-icon">🦺</div>
@@ -436,7 +436,7 @@ window.onerror = function(msg, src, line, col, err) {
 };
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v2.3';
+const APP_VERSION = 'v2.4';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
@@ -1006,10 +1006,14 @@ async function submitPackage() {
       submitted_at: new Date().toISOString(),
     };
 
-    // Always save to local ledger first
+    // Save to local ledger — strip base64 images to avoid localStorage quota
+    const entryForStorage = {...entry};
+    delete entryForStorage.ta_image_b64;
+    delete entryForStorage.ta_image_mime;
+    delete entryForStorage.receipt_images;
     const entries = getEntries();
     const idx = entries.findIndex(e => e.date === entry.date && e.status === 'pending');
-    if (idx >= 0) entries[idx] = entry; else entries.push(entry);
+    if (idx >= 0) entries[idx] = entryForStorage; else entries.push(entryForStorage);
     saveEntries(entries);
 
     if (isOnline) {
@@ -1474,6 +1478,21 @@ function showToast(msg) {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
+// Clean up any oversized entries in localStorage
+try {
+  const entries = getEntries();
+  const cleaned = entries.map(e => {
+    const c = {...e};
+    delete c.ta_image_b64;
+    delete c.receipt_images;
+    return c;
+  });
+  saveEntries(cleaned);
+} catch(e) {
+  // If localStorage is still full, clear it and start fresh
+  localStorage.removeItem('tm_entries');
+  localStorage.removeItem('tm_queue');
+}
 seedData();
 updateOnlineStatus();
 // Clear any stale scan state so app always starts at Step 1
