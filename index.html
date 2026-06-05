@@ -424,7 +424,7 @@
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v1.6';
+const APP_VERSION = 'v1.7';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
@@ -977,40 +977,54 @@ async function submitPackage() {
     return;
   }
 
-  const entry = {
-    id: 'entry_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-    ...entryTA,
-    receipts: pendingReceipts.map(r => r.parsed),
-    ta_image_b64: pendingTABase64,
-    ta_image_mime: pendingTAMime,
-    receipt_images: pendingReceipts.map(r => ({ b64: r.base64, mime: r.mimeType })),
-    status: 'pending',
-    submitted_at: new Date().toISOString(),
-  };
+  // Show loading state on buttons
+  const doneBtn = document.getElementById('receipt-phase-actions');
+  const origHTML = doneBtn ? doneBtn.innerHTML : '';
+  if (doneBtn) doneBtn.innerHTML = '<div style="text-align:center;padding:12px;color:var(--accent);font-family:'Barlow Condensed',sans-serif;font-size:14px;letter-spacing:2px;" class="pulse">⬡ SUBMITTING...</div>';
 
-  // Save to local ledger
-  if (isOnline) {
+  try {
+    const entry = {
+      id: 'entry_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      ...entryTA,
+      receipts: pendingReceipts.map(r => r.parsed),
+      ta_image_b64: pendingTABase64 || '',
+      ta_image_mime: pendingTAMime || 'image/jpeg',
+      receipt_images: pendingReceipts.map(r => ({ b64: r.base64, mime: r.mimeType })),
+      status: 'pending',
+      submitted_at: new Date().toISOString(),
+    };
+
+    // Always save to local ledger first
     const entries = getEntries();
     const idx = entries.findIndex(e => e.date === entry.date && e.status === 'pending');
     if (idx >= 0) entries[idx] = entry; else entries.push(entry);
     saveEntries(entries);
-    showToast('✓ Submitted for PM review');
-    // Send to SharePoint webhook if configured
-    sendToSharePoint(entry);
-  } else {
-    const q = getQueue();
-    q.push(entry);
-    saveQueue(q);
-    showToast('⚡ Queued — will sync when online');
-  }
 
-  localStorage.removeItem('tm_pending_ta');
-  pendingReceipts = [];
-  pendingTABase64 = null;
-  pendingTAMime = null;
-  resetScan();
-  renderQueueList();
-  updateReviewBadge();
+    if (isOnline) {
+      showToast('✓ Saved locally — syncing to SharePoint...');
+      // Send to SharePoint webhook if configured (non-blocking)
+      sendToSharePoint(entry);
+    } else {
+      const q = getQueue();
+      q.push(entry);
+      saveQueue(q);
+      showToast('⚡ Saved locally — will sync when online');
+    }
+
+    localStorage.removeItem('tm_pending_ta');
+    pendingReceipts = [];
+    pendingTABase64 = null;
+    pendingTAMime = null;
+    resetScan();
+    renderQueueList();
+    updateReviewBadge();
+    showToast('✓ Submitted successfully!');
+
+  } catch(err) {
+    console.error('submitPackage error:', err);
+    showToast('Error: ' + (err.message || 'Submission failed — try again'));
+    if (doneBtn) doneBtn.innerHTML = origHTML;
+  }
 }
 
 // Legacy — kept so old buttons still work
@@ -1018,9 +1032,11 @@ function submitForm() { submitPackage(); }
 
 async function sendToSharePoint(entry) {
   const webhookUrl = getWebhook();
-  if (!webhookUrl) return;
+  if (!webhookUrl) {
+    console.log('No webhook configured — skipping SharePoint sync');
+    return;
+  }
   try {
-    // Build a clean payload without huge base64 images in the main body
     const payload = {
       id: entry.id,
       date: entry.date,
@@ -1036,22 +1052,29 @@ async function sendToSharePoint(entry) {
       equipment: entry.equipment || [],
       materials: entry.materials || [],
       receipts: entry.receipts || [],
-      ta_image_b64: entry.ta_image_b64 || '',
+      ta_image_b64: '',
       ta_image_mime: entry.ta_image_mime || 'image/jpeg',
-      receipt_images: entry.receipt_images || [],
+      receipt_images: [],
       total_labor_st: (entry.labor||[]).reduce((s,l)=>s+(l.st||0),0),
       total_labor_ot: (entry.labor||[]).reduce((s,l)=>s+(l.ot||0),0),
       total_equip_hrs: (entry.equipment||[]).reduce((s,e)=>s+(e.hours||0),0),
       total_material_cost: (entry.receipts||[]).reduce((s,r)=>s+(r.total||0),0),
     };
-    await fetch(webhookUrl, {
+    const resp = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    showToast('✓ Synced to SharePoint');
+    if (resp.ok) {
+      showToast('✓ Synced to SharePoint');
+    } else {
+      const errText = await resp.text();
+      console.error('SharePoint webhook error:', resp.status, errText);
+      showToast('SharePoint sync error ' + resp.status + ' — data saved locally');
+    }
   } catch(e) {
     console.error('SharePoint sync failed:', e);
+    showToast('SharePoint unreachable — data saved locally');
   }
 }
 
