@@ -236,7 +236,7 @@
   <div style="text-align:center; margin-bottom:32px;">
     <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800; letter-spacing:3px; color:#fff;">POLO ENGINEERING</div>
     <div style="font-size:10px; color:var(--text3); letter-spacing:2px; margin-top:4px;">T&M FORCE ACCOUNT SYSTEM · CONTRACT 07-2XW04</div>
-    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.7 · 2026-06-05</div>
+    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.8 · 2026-06-05</div>
   </div>
   <div class="role-card" onclick="setRole('inspector')">
     <div class="role-card-icon">🦺</div>
@@ -436,7 +436,7 @@ window.onerror = function(msg, src, line, col, err) {
 };
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v2.7';
+const APP_VERSION = 'v2.8';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
@@ -1146,7 +1146,7 @@ async function sendImagesToSharePoint(entry) {
           body: JSON.stringify({
             entry_id: entry.id,
             image_type: 'receipt',
-            image_b64: img.b64,
+            image_b64: 'data:' + (img.mime || 'image/jpeg') + ';base64,' + img.b64,
             image_mime: img.mime || 'image/jpeg',
             file_name: entry.id + '_Receipt_' + (i+1) + '.jpg',
             date: entry.date,
