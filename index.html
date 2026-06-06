@@ -236,7 +236,7 @@
   <div style="text-align:center; margin-bottom:32px;">
     <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800; letter-spacing:3px; color:#fff;">POLO ENGINEERING</div>
     <div style="font-size:10px; color:var(--text3); letter-spacing:2px; margin-top:4px;">T&M FORCE ACCOUNT SYSTEM · CONTRACT 07-2XW04</div>
-    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.6 · 2026-06-05</div>
+    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.7 · 2026-06-05</div>
   </div>
   <div class="role-card" onclick="setRole('inspector')">
     <div class="role-card-icon">🦺</div>
@@ -436,7 +436,7 @@ window.onerror = function(msg, src, line, col, err) {
 };
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v2.6';
+const APP_VERSION = 'v2.7';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
@@ -451,10 +451,13 @@ let scanPhase = 'ta';       // 'ta' | 'receipts'
 const KEY_ENTRIES = 'tm_entries';
 const KEY_QUEUE   = 'tm_queue';
 const KEY_APIKEY   = 'tm_apikey';
-const KEY_WEBHOOK  = 'tm_webhook';
+const KEY_WEBHOOK       = 'tm_webhook';
+const KEY_IMAGE_WEBHOOK = 'tm_image_webhook';
 
-function getWebhook()    { return localStorage.getItem(KEY_WEBHOOK) || ''; }
-function saveWebhook(u)  { localStorage.setItem(KEY_WEBHOOK, u.trim()); }
+function getWebhook()         { return localStorage.getItem(KEY_WEBHOOK) || ''; }
+function saveWebhook(u)       { localStorage.setItem(KEY_WEBHOOK, u.trim()); }
+function getImageWebhook()    { return localStorage.getItem(KEY_IMAGE_WEBHOOK) || ''; }
+function saveImageWebhook(u)  { localStorage.setItem(KEY_IMAGE_WEBHOOK, u.trim()); }
 
 function getApiKey()       { return localStorage.getItem(KEY_APIKEY) || ''; }
 function saveApiKey(k)     { localStorage.setItem(KEY_APIKEY, k.trim()); }
@@ -523,6 +526,8 @@ function showApiKeyScreen() {
   if (existing) document.getElementById('apikey-input').value = existing;
   const wh = document.getElementById('webhook-input');
   if (wh) wh.value = getWebhook();
+  const iwh = document.getElementById('image-webhook-input');
+  if (iwh) iwh.value = getImageWebhook();
 }
 
 function saveApiKeyAndContinue() {
@@ -535,6 +540,8 @@ function saveApiKeyAndContinue() {
   saveApiKey(val);
   const wh = document.getElementById('webhook-input');
   if (wh && wh.value.trim()) saveWebhook(wh.value.trim());
+  const iwh = document.getElementById('image-webhook-input');
+  if (iwh && iwh.value.trim()) saveImageWebhook(iwh.value.trim());
   document.getElementById('apikey-screen').style.display = 'none';
   document.getElementById('role-screen').style.display = 'flex';
 }
@@ -1017,6 +1024,8 @@ async function submitPackage() {
     if (isOnline) {
       // Fire SharePoint sync in background — don't await
       setTimeout(() => sendToSharePoint(entry), 100);
+      // Fire image upload separately with delay
+      setTimeout(() => sendImagesToSharePoint(entry), 500);
     } else {
       const q = getQueue();
       q.push(entry);
@@ -1094,6 +1103,63 @@ async function sendToSharePoint(entry) {
   } catch(e) {
     console.error('SharePoint sync failed:', e);
     showToast('SharePoint unreachable — data saved locally');
+  }
+}
+
+async function sendImagesToSharePoint(entry) {
+  const imageWebhookUrl = getImageWebhook();
+  if (!imageWebhookUrl) return;
+  if (!entry.ta_image_b64 && (!entry.receipt_images || entry.receipt_images.length === 0)) return;
+
+  try {
+    // Send TA image
+    if (entry.ta_image_b64) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      await fetch(imageWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entry_id: entry.id,
+          image_type: 'ta_form',
+          image_b64: entry.ta_image_b64,
+          image_mime: entry.ta_image_mime || 'image/jpeg',
+          file_name: entry.id + '_TA.jpg',
+          date: entry.date,
+          description: entry.description || ''
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+    }
+
+    // Send receipt images one at a time
+    if (entry.receipt_images && entry.receipt_images.length > 0) {
+      for (let i = 0; i < entry.receipt_images.length; i++) {
+        const img = entry.receipt_images[i];
+        if (!img.b64) continue;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        await fetch(imageWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            entry_id: entry.id,
+            image_type: 'receipt',
+            image_b64: img.b64,
+            image_mime: img.mime || 'image/jpeg',
+            file_name: entry.id + '_Receipt_' + (i+1) + '.jpg',
+            date: entry.date,
+            description: entry.description || ''
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+      }
+    }
+    showToast('✓ Images uploaded to SharePoint');
+  } catch(e) {
+    console.error('Image upload failed:', e);
   }
 }
 
