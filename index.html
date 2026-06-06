@@ -236,7 +236,7 @@
   <div style="text-align:center; margin-bottom:32px;">
     <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800; letter-spacing:3px; color:#fff;">POLO ENGINEERING</div>
     <div style="font-size:10px; color:var(--text3); letter-spacing:2px; margin-top:4px;">T&M FORCE ACCOUNT SYSTEM · CONTRACT 07-2XW04</div>
-    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.4 · 2026-06-05</div>
+    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.5 · 2026-06-05</div>
   </div>
   <div class="role-card" onclick="setRole('inspector')">
     <div class="role-card-icon">🦺</div>
@@ -436,7 +436,7 @@ window.onerror = function(msg, src, line, col, err) {
 };
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v2.4';
+const APP_VERSION = 'v2.5';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
@@ -1009,7 +1009,6 @@ async function submitPackage() {
     // Save to local ledger — strip base64 images to avoid localStorage quota
     const entryForStorage = {...entry};
     delete entryForStorage.ta_image_b64;
-    delete entryForStorage.ta_image_mime;
     delete entryForStorage.receipt_images;
     const entries = getEntries();
     const idx = entries.findIndex(e => e.date === entry.date && e.status === 'pending');
@@ -1018,7 +1017,7 @@ async function submitPackage() {
 
     if (isOnline) {
       showToast('✓ Saved locally — syncing to SharePoint...');
-      // Send to SharePoint webhook if configured (non-blocking)
+      // Send full entry including images to SharePoint (non-blocking)
       sendToSharePoint(entry);
     } else {
       const q = getQueue();
@@ -1053,6 +1052,7 @@ async function sendToSharePoint(entry) {
     return;
   }
   try {
+    // Step 1: Send structured data
     const payload = {
       id: entry.id,
       date: entry.date,
@@ -1068,9 +1068,9 @@ async function sendToSharePoint(entry) {
       equipment: entry.equipment || [],
       materials: entry.materials || [],
       receipts: entry.receipts || [],
-      ta_image_b64: '',
+      ta_image_b64: entry.ta_image_b64 || '',
       ta_image_mime: entry.ta_image_mime || 'image/jpeg',
-      receipt_images: [],
+      receipt_images: entry.receipt_images || [],
       total_labor_st: (entry.labor||[]).reduce((s,l)=>s+(l.st||0),0),
       total_labor_ot: (entry.labor||[]).reduce((s,l)=>s+(l.ot||0),0),
       total_equip_hrs: (entry.equipment||[]).reduce((s,e)=>s+(e.hours||0),0),
