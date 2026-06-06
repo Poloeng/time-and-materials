@@ -236,7 +236,7 @@
   <div style="text-align:center; margin-bottom:32px;">
     <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800; letter-spacing:3px; color:#fff;">POLO ENGINEERING</div>
     <div style="font-size:10px; color:var(--text3); letter-spacing:2px; margin-top:4px;">T&M FORCE ACCOUNT SYSTEM · CONTRACT 07-2XW04</div>
-    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.8 · 2026-06-05</div>
+    <div style="font-size:11px; color:#f5a623; letter-spacing:2px; margin-top:6px; font-family:'Barlow Condensed',sans-serif; font-weight:700;" id="landing-version-tag">v2.9 · 2026-06-05</div>
   </div>
   <div class="role-card" onclick="setRole('inspector')">
     <div class="role-card-icon">🦺</div>
@@ -436,7 +436,7 @@ window.onerror = function(msg, src, line, col, err) {
 };
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const APP_VERSION = 'v2.8';
+const APP_VERSION = 'v2.9';
 const APP_DATE    = '2026-06-05';
 let role = null;
 let isOnline = navigator.onLine;
@@ -1021,11 +1021,21 @@ async function submitPackage() {
     if (idx >= 0) entries[idx] = entryForStorage; else entries.push(entryForStorage);
     saveEntries(entries);
 
+    // Capture image data before reset clears it
+    const imageEntry = {
+      id: entry.id,
+      date: entry.date,
+      description: entry.description,
+      ta_image_b64: pendingTABase64 || '',
+      ta_image_mime: pendingTAMime || 'image/jpeg',
+      receipt_images: pendingReceipts.map(r => ({ b64: r.base64, mime: r.mimeType }))
+    };
+
     if (isOnline) {
       // Fire SharePoint sync in background — don't await
       setTimeout(() => sendToSharePoint(entry), 100);
-      // Fire image upload separately with delay
-      setTimeout(() => sendImagesToSharePoint(entry), 500);
+      // Fire image upload separately with delay — use captured imageEntry
+      setTimeout(() => sendImagesToSharePoint(imageEntry), 800);
     } else {
       const q = getQueue();
       q.push(entry);
